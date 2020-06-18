@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <FS.h>
 #include <EEPROM.h>
 #include <DNSServer.h>
@@ -23,6 +24,17 @@ WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
 
 // **********************************
+// * Ticker (System LED Blinker)    *
+// **********************************
+
+// * Blink on-board Led
+void tick()
+{
+    // * Toggle state
+    int state = digitalRead(LED_BUILTIN);    // * Get the current state of GPIO1 pin
+    digitalWrite(LED_BUILTIN, !state);       // * Set pin to the opposite state
+}
+// **********************************
 // * WIFI                           *
 // **********************************
 
@@ -39,17 +51,6 @@ void configModeCallback(WiFiManager *myWiFiManager)
     ticker.attach(0.2, tick);
 }
 
-// **********************************
-// * Ticker (System LED Blinker)    *
-// **********************************
-
-// * Blink on-board Led
-void tick()
-{
-    // * Toggle state
-    int state = digitalRead(LED_BUILTIN);    // * Get the current state of GPIO1 pin
-    digitalWrite(LED_BUILTIN, !state);       // * Set pin to the opposite state
-}
 
 // **********************************
 // * MQTT                           *
@@ -412,7 +413,17 @@ bool decode_telegram(int len)
 
     return validCRCFound;
 }
+void processLine(int len) {
+    telegram[len] = '\n';
+    telegram[len + 1] = 0;
+    yield();
 
+    bool result = decode_telegram(len + 1);
+    if (result) {
+        send_data_to_broker();
+        LAST_UPDATE_SENT = millis();
+    }
+}
 void read_p1_hardwareserial()
 {
     if (Serial.available())
@@ -430,17 +441,7 @@ void read_p1_hardwareserial()
     }
 }
 
-void processLine(int len) {
-    telegram[len] = '\n';
-    telegram[len + 1] = 0;
-    yield();
 
-    bool result = decode_telegram(len + 1);
-    if (result) {
-        send_data_to_broker();
-        LAST_UPDATE_SENT = millis();
-    }
-}
 
 // **********************************
 // * EEPROM helpers                 *
