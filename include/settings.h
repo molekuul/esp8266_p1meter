@@ -3,18 +3,19 @@
 // **********************************
 
 // Update treshold in milliseconds, messages will only be sent on this interval
-#define UPDATE_INTERVAL 60000  // 1 minute
+#define UPDATE_INTERVAL 60000 // 1 minute
 //#define UPDATE_INTERVAL 300000 // 5 minutes
 
-// * Baud rate for both hardware and software 
+// * Baud rate for both hardware and software
 #define BAUD_RATE 115200
 
 // The used serial pins, note that this can only be UART0, as other ports dont support the required inversion
-#define SERIAL_RX RX
-#define SERIAL_TX TX
+// #define SERIAL_RX RX
+// #define SERIAL_TX TX
+#define SERIAL_RX D5 // pin for SoftwareSerial RX
 
 // * Max telegram length
-#define P1_MAXLINELENGTH 1050
+#define P1_MAXLINELENGTH 128
 
 // * The hostname of our little creature
 #define HOSTNAME "p1meter"
@@ -38,7 +39,7 @@ long LAST_UPDATE_SENT = 0;
 
 // * To be filled with EEPROM data
 char MQTT_HOST[64] = "";
-char MQTT_PORT[6]  = "";
+char MQTT_PORT[6] = "";
 char MQTT_USER[32] = "";
 char MQTT_PASS[32] = "";
 

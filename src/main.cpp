@@ -23,6 +23,8 @@ WiFiClient espClient;
 // * Initiate MQTT client
 PubSubClient mqtt_client(espClient);
 
+SoftwareSerial mySerial(D5, -1, true);
+
 // **********************************
 // * Ticker (System LED Blinker)    *
 // **********************************
@@ -31,8 +33,8 @@ PubSubClient mqtt_client(espClient);
 void tick()
 {
     // * Toggle state
-    int state = digitalRead(LED_BUILTIN);    // * Get the current state of GPIO1 pin
-    digitalWrite(LED_BUILTIN, !state);       // * Set pin to the opposite state
+    int state = digitalRead(LED_BUILTIN); // * Get the current state of GPIO1 pin
+    digitalWrite(LED_BUILTIN, !state);    // * Set pin to the opposite state
 }
 // **********************************
 // * WIFI                           *
@@ -50,7 +52,6 @@ void configModeCallback(WiFiManager *myWiFiManager)
     // * Entered config mode, make led toggle faster
     ticker.attach(0.2, tick);
 }
-
 
 // **********************************
 // * MQTT                           *
@@ -147,7 +148,7 @@ void send_data_to_broker()
     send_metric("l1_voltage", L1_VOLTAGE);
     send_metric("l2_voltage", L2_VOLTAGE);
     send_metric("l3_voltage", L3_VOLTAGE);
-    
+
     send_metric("gas_meter_m3", GAS_METER_M3);
 
     send_metric("actual_tarif_group", ACTUAL_TARIF);
@@ -163,10 +164,10 @@ void send_data_to_broker()
 
 unsigned int CRC16(unsigned int crc, unsigned char *buf, int len)
 {
-	for (int pos = 0; pos < len; pos++)
+    for (int pos = 0; pos < len; pos++)
     {
-		crc ^= (unsigned int)buf[pos];    // * XOR byte into least sig. byte of crc
-                                          // * Loop over each bit
+        crc ^= (unsigned int)buf[pos]; // * XOR byte into least sig. byte of crc
+                                       // * Loop over each bit
         for (int i = 8; i != 0; i--)
         {
             // * If the LSB is set
@@ -174,15 +175,15 @@ unsigned int CRC16(unsigned int crc, unsigned char *buf, int len)
             {
                 // * Shift right and XOR 0xA001
                 crc >>= 1;
-				crc ^= 0xA001;
-			}
+                crc ^= 0xA001;
+            }
             // * Else LSB is not set
             else
                 // * Just shift right
                 crc >>= 1;
-		}
-	}
-	return crc;
+        }
+    }
+    return crc;
 }
 
 bool isNumber(char *res, int len)
@@ -236,25 +237,26 @@ bool decode_telegram(int len)
     int endChar = FindCharInArrayRev(telegram, '!', len);
     bool validCRCFound = false;
 
-    for (int cnt = 0; cnt < len; cnt++) {
+    for (int cnt = 0; cnt < len; cnt++)
+    {
         Serial.print(telegram[cnt]);
     }
-    Serial.print("\n");
+    // Serial.print("\n");
 
     if (startChar >= 0)
     {
         // * Start found. Reset CRC calculation
-        currentCRC = CRC16(0x0000,(unsigned char *) telegram+startChar, len-startChar);
+        currentCRC = CRC16(0x0000, (unsigned char *)telegram + startChar, len - startChar);
     }
     else if (endChar >= 0)
     {
         // * Add to crc calc
-        currentCRC = CRC16(currentCRC,(unsigned char*)telegram+endChar, 1);
+        currentCRC = CRC16(currentCRC, (unsigned char *)telegram + endChar, 1);
 
         char messageCRC[5];
         strncpy(messageCRC, telegram + endChar + 1, 4);
 
-        messageCRC[4] = 0;   // * Thanks to HarmOtten (issue 5)
+        messageCRC[4] = 0; // * Thanks to HarmOtten (issue 5)
         validCRCFound = (strtol(messageCRC, NULL, 16) == currentCRC);
 
         if (validCRCFound)
@@ -266,7 +268,7 @@ bool decode_telegram(int len)
     }
     else
     {
-        currentCRC = CRC16(currentCRC, (unsigned char*) telegram, len);
+        currentCRC = CRC16(currentCRC, (unsigned char *)telegram, len);
     }
 
     // 1-0:1.8.1(000992.992*kWh)
@@ -282,7 +284,7 @@ bool decode_telegram(int len)
     {
         CONSUMPTION_HIGH_TARIF = getValue(telegram, len, '(', '*');
     }
-	
+
     // 1-0:2.8.1(000560.157*kWh)
     // 1-0:2.8.1 = Elektra teruglevering laag tarief (DSMR v4.0)
     if (strncmp(telegram, "1-0:2.8.1", strlen("1-0:2.8.1")) == 0)
@@ -361,7 +363,7 @@ bool decode_telegram(int len)
     if (strncmp(telegram, "1-0:52.7.0", strlen("1-0:52.7.0")) == 0)
     {
         L2_VOLTAGE = getValue(telegram, len, '(', '*');
-    }   
+    }
     // 1-0:72.7.0(232.0*V)
     // 1-0:72.7.0 = Voltage L3
     if (strncmp(telegram, "1-0:72.7.0", strlen("1-0:72.7.0")) == 0)
@@ -413,35 +415,34 @@ bool decode_telegram(int len)
 
     return validCRCFound;
 }
-void processLine(int len) {
+void processLine(int len)
+{
     telegram[len] = '\n';
     telegram[len + 1] = 0;
     yield();
 
     bool result = decode_telegram(len + 1);
-    if (result) {
+    if (result)
+    {
         send_data_to_broker();
         LAST_UPDATE_SENT = millis();
     }
 }
 void read_p1_hardwareserial()
 {
-    if (Serial.available())
+    if (mySerial.available())
     {
         memset(telegram, 0, sizeof(telegram));
-
-        while (Serial.available())
+        while (mySerial.available())
         {
             ESP.wdtDisable();
-            int len = Serial.readBytesUntil('\n', telegram, P1_MAXLINELENGTH);
+            int len = mySerial.readBytesUntil('\n', telegram, P1_MAXLINELENGTH);
             ESP.wdtEnable(1);
 
             processLine(len);
         }
     }
 }
-
-
 
 // **********************************
 // * EEPROM helpers                 *
@@ -482,7 +483,7 @@ void write_eeprom(int offset, int len, String value)
 bool shouldSaveConfig = false;
 
 // * Callback notifying us of the need to save config
-void save_wifi_config_callback ()
+void save_wifi_config_callback()
 {
     Serial.println(F("Should save config"));
     shouldSaveConfig = true;
@@ -504,22 +505,16 @@ void setup_ota()
     ArduinoOTA.setPassword(OTA_PASSWORD);
 
     ArduinoOTA.onStart([]()
-    {
-        Serial.println(F("Arduino OTA: Start"));
-    });
+                       { Serial.println(F("Arduino OTA: Start")); });
 
     ArduinoOTA.onEnd([]()
-    {
-        Serial.println(F("Arduino OTA: End (Running reboot)"));
-    });
+                     { Serial.println(F("Arduino OTA: End (Running reboot)")); });
 
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
-    {
-        Serial.printf("Arduino OTA Progress: %u%%\r", (progress / (total / 100)));
-    });
+                          { Serial.printf("Arduino OTA Progress: %u%%\r", (progress / (total / 100))); });
 
     ArduinoOTA.onError([](ota_error_t error)
-    {
+                       {
         Serial.printf("Arduino OTA Error[%u]: ", error);
         if (error == OTA_AUTH_ERROR)
             Serial.println(F("Arduino OTA: Auth Failed"));
@@ -530,8 +525,7 @@ void setup_ota()
         else if (error == OTA_RECEIVE_ERROR)
             Serial.println(F("Arduino OTA: Receive Failed"));
         else if (error == OTA_END_ERROR)
-            Serial.println(F("Arduino OTA: End Failed"));
-    });
+            Serial.println(F("Arduino OTA: End Failed")); });
 
     ArduinoOTA.begin();
     Serial.println(F("Arduino OTA finished"));
@@ -561,15 +555,13 @@ void setup()
     // * Configure EEPROM
     EEPROM.begin(512);
 
-    // Setup a hw serial connection for communication with the P1 meter and logging
-    Serial.begin(BAUD_RATE, SERIAL_8N1, SERIAL_FULL, SERIAL_TX, false);
+    // Setup a hw serial connection for logging
+    Serial.begin(BAUD_RATE);
     Serial.println("");
-    Serial.println("Swapping UART0 RX to inverted");
-    Serial.flush();
 
-    // Invert the RX serialport by setting a register value, this way the TX might continue normally allowing the serial monitor to read println's
-    USC0(UART0) = USC0(UART0) | BIT(UCRXI);
-    Serial.println("Serial port is ready to recieve.");
+    // Setup Serial for connection to P1 meter
+    // mySerial.begin(BAUD_RATE);
+    mySerial.begin(BAUD_RATE, SWSERIAL_8N1, SERIAL_RX, -1, true, 128);
 
     // * Set led pin as output
     pinMode(LED_BUILTIN, OUTPUT);
@@ -589,9 +581,9 @@ void setup()
     }
 
     WiFiManagerParameter CUSTOM_MQTT_HOST("host", "MQTT hostname", MQTT_HOST, 64);
-    WiFiManagerParameter CUSTOM_MQTT_PORT("port", "MQTT port",     MQTT_PORT, 6);
-    WiFiManagerParameter CUSTOM_MQTT_USER("user", "MQTT user",     MQTT_USER, 32);
-    WiFiManagerParameter CUSTOM_MQTT_PASS("pass", "MQTT pass",     MQTT_PASS, 32);
+    WiFiManagerParameter CUSTOM_MQTT_PORT("port", "MQTT port", MQTT_PORT, 6);
+    WiFiManagerParameter CUSTOM_MQTT_USER("user", "MQTT user", MQTT_USER, 32);
+    WiFiManagerParameter CUSTOM_MQTT_PASS("pass", "MQTT pass", MQTT_PASS, 32);
 
     // * WiFiManager local initialization. Once its business is done, there is no need to keep it around
     WiFiManager wifiManager;
@@ -661,7 +653,6 @@ void setup()
     Serial.printf("MQTT connecting to: %s:%s\n", MQTT_HOST, MQTT_PORT);
 
     mqtt_client.setServer(MQTT_HOST, atoi(MQTT_PORT));
-
 }
 
 // **********************************
@@ -689,8 +680,9 @@ void loop()
     {
         mqtt_client.loop();
     }
-    
-    if (now - LAST_UPDATE_SENT > UPDATE_INTERVAL) {
-        read_p1_hardwareserial();
-    }
+
+    // if (now - LAST_UPDATE_SENT > UPDATE_INTERVAL)
+    //{
+    read_p1_hardwareserial();
+    //}
 }
